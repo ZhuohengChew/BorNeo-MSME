@@ -47,6 +47,85 @@ sales_data = []
 loan_model = None
 scaler = StandardScaler()
 
+# Malaysian Holidays and Seasons for 2026
+MALAYSIAN_HOLIDAYS = {
+    "2026-03-21": {"name": "Hari Raya Puasa", "impact": 0.70},
+    "2026-03-22": {"name": "Hari Raya Puasa (2nd Day)", "impact": 0.65},
+    "2026-03-23": {"name": "Sultan of Johor's Birthday", "impact": 0.20},
+}
+
+# Seasonal patterns for Malaysia
+SEASONAL_BOOST = {
+    (1, 1): 0.10,    # January - New Year
+    (2, 1): 0.15,    # February - CNY prep
+    (3, 1): 0.05,    # March - Post-CNY
+    (4, 1): 0.20,    # April - Ramadan/Eid strong
+    (5, 1): 0.08,    # May
+    (6, 1): 0.05,    # June - Mid-year
+    (7, 1): 0.08,    # July - Mid-year
+    (8, 1): 0.12,    # August - Merdeka
+    (9, 1): 0.12,    # September - Malaysia Day
+    (10, 1): 0.10,   # October - Deepavali
+    (11, 1): 0.15,   # November - Holiday prep
+    (12, 1): 0.30,   # December - Year-end peak
+}
+
+def generate_mock_sales_data():
+    """Generate 60 days of realistic mock sales data"""
+    global sales_data
+    # Always regenerate to ensure fresh data
+    sales_data = []
+    
+    base_revenue = 45000  # Realistic MSME daily revenue (RM 40k-60k)
+    today = datetime.now()
+    
+    for i in range(60, 0, -1):  # Past 60 days
+        current_date = today - timedelta(days=i)
+        date_str = current_date.strftime("%Y-%m-%d")
+        
+        # Base revenue with daily variance
+        daily_revenue = base_revenue * np.random.normal(1.0, 0.15)
+        
+        # Add seasonal boost
+        month = current_date.month
+        seasonal = SEASONAL_BOOST.get((month, 1), 0)
+        daily_revenue *= (1 + seasonal)
+        
+        # Add holiday impact if applicable
+        if date_str in MALAYSIAN_HOLIDAYS:
+            holiday_impact = MALAYSIAN_HOLIDAYS[date_str]["impact"]
+            daily_revenue *= (1 + holiday_impact)
+        
+        # Add weekend boost
+        if current_date.weekday() >= 4:  # Friday and Saturday
+            daily_revenue *= 1.1
+        
+        sales_data.append({
+            "product": np.random.choice(["Product A", "Product B", "Product C", "Product D"]),
+            "quantity": int(np.random.randint(10, 50)),
+            "date": date_str,
+            "revenue": max(10000, daily_revenue)  # Minimum floor
+        })
+
+# Generate initial mock data on startup
+generate_mock_sales_data()
+
+# Reset endpoint to force regenerate fresh mock data
+@app.post("/api/reset")
+async def reset_data():
+    """Reset all data and regenerate fresh mock sales data"""
+    global business_data, products_data, sales_data, loan_model
+    business_data = {}
+    products_data = []
+    sales_data = []
+    loan_model = None
+    generate_mock_sales_data()
+    return {
+        "message": "Data reset successfully", 
+        "sales_records": len(sales_data),
+        "sample": sales_data[0] if sales_data else None
+    }
+
 # Pydantic models
 class BusinessProfile(BaseModel):
     business_name: str
@@ -135,7 +214,7 @@ def _calculate_revenue_stability():
     return 0.5
 
 def forecast_with_arima(days=30):
-    """ARIMA forecasting"""
+    """ARIMA forecasting with Malaysian holiday and seasonal adjustments"""
     if not ARIMA_AVAILABLE or not sales_data:
         return None
 
@@ -143,22 +222,77 @@ def forecast_with_arima(days=30):
         df = pd.DataFrame(sales_data)
         df['date'] = pd.to_datetime(df['date'])
 
+        # Group by date and sum revenue for each day
         forecast_input = df.groupby('date')['revenue'].sum().reset_index()
-        forecast_input = forecast_input.sort_values('date')
+        forecast_input = forecast_input.sort_values('date').reset_index(drop=True)
 
         if len(forecast_input) < 7:
             return None
 
-        model = ARIMA(forecast_input['revenue'], order=(1, 1, 1))
+        # Train ARIMA model on daily revenue
+        model = ARIMA(forecast_input['revenue'].values, order=(1, 1, 1))
         results = model.fit()
 
-        forecast = results.get_forecast(steps=days)
-        forecast_df = forecast.conf_int(alpha=0.2)
-        forecast_df['yhat'] = forecast.predicted_mean
+        # Get forecast with confidence intervals
+        forecast_result = results.get_forecast(steps=days)
+        forecast_mean = np.array(forecast_result.predicted_mean)
+        conf_int_df = forecast_result.conf_int(alpha=0.2)
+        forecast_ci = np.array(conf_int_df)
 
-        return forecast_df
+        # Build adjusted forecasts list
+        adjusted_forecasts = []
+        today = datetime.now()
+        
+        for i in range(days):
+            current_date = today + timedelta(days=i+1)
+            date_str = current_date.strftime("%Y-%m-%d")
+            
+            base_forecast = forecast_mean[i]
+            lower_ci = forecast_ci[i][0]
+            upper_ci = forecast_ci[i][1]
+            
+            adjustment = 1.0
+            
+            # Apply seasonal boost
+            month = current_date.month
+            seasonal = SEASONAL_BOOST.get((month, 1), 0)
+            adjustment *= (1 + seasonal)
+            
+            # Apply holiday impact
+            holiday_name = None
+            holiday_impact = 0
+            if date_str in MALAYSIAN_HOLIDAYS:
+                holiday_info = MALAYSIAN_HOLIDAYS[date_str]
+                holiday_name = holiday_info["name"]
+                holiday_impact = holiday_info["impact"]
+                adjustment *= (1 + holiday_impact)
+            
+            # Apply weekend boost
+            if current_date.weekday() >= 4:  # Friday and Saturday
+                adjustment *= 1.1
+            
+            adjusted_yhat = base_forecast * adjustment
+            adjusted_lower = lower_ci * adjustment
+            adjusted_upper = upper_ci * adjustment
+            
+            adjusted_forecasts.append({
+                'day': i + 1,
+                'yhat': float(adjusted_yhat),
+                'yhat_lower': float(adjusted_lower),
+                'yhat_upper': float(adjusted_upper),
+                'date': date_str,
+                'holiday': holiday_name,
+                'holiday_impact': holiday_impact,
+                'seasonal_boost': seasonal,
+                'is_weekend': current_date.weekday() >= 4
+            })
+        
+        return adjusted_forecasts
 
-    except:
+    except Exception as e:
+        print(f"Forecast error: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 # Analytics functions
@@ -354,15 +488,27 @@ async def get_analytics():
 
 @app.get("/api/forecast")
 async def get_forecast(days: int = 30):
-    """Get demand forecast"""
+    """Get demand forecast with holiday and seasonal adjustments"""
     forecast = forecast_with_arima(days)
 
     if forecast is None:
         return {"message": "Not enough data for forecasting"}
 
+    # Extract holidays from forecast
+    holidays = [
+        {
+            "date": item["date"],
+            "name": item["holiday"],
+            "sales_increase": f"{item['holiday_impact']*100:.0f}%"
+        }
+        for item in forecast
+        if item["holiday"] is not None
+    ]
+
     return {
-        "forecast": forecast.to_dict('records'),
-        "days": days
+        "forecast": forecast,
+        "days": days,
+        "holidays": holidays
     }
 
 @app.post("/api/simulation")

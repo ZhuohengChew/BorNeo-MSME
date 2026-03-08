@@ -115,15 +115,40 @@ export default function Analytics() {
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={analytics?.monthly_trend || []}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip formatter={(value) => [`RM ${value.toLocaleString()}`, "Revenue"]} />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(date) => {
+                    if (!date) return ''
+                    const d = new Date(date)
+                    return d.toLocaleDateString('en-MY', { year: 'numeric', month: 'short' })
+                  }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis tickFormatter={(value) => value.toLocaleString('en-MY', { maximumFractionDigits: 0 })} />
+                <Tooltip 
+                  formatter={(value) => [`RM ${value.toLocaleString('en-MY', { maximumFractionDigits: 0 })}`, "Revenue"]}
+                  labelFormatter={(label) => {
+                    if (!label) return ''
+                    const d = new Date(label)
+                    return `📅 ${d.toLocaleDateString('en-MY', { year: 'numeric', month: 'long', day: 'numeric' })}`
+                  }}
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #ccc',
+                    borderRadius: '8px',
+                    padding: '12px'
+                  }}
+                  cursor={{ strokeDasharray: '3 3' }}
+                />
                 <Line
                   type="monotone"
                   dataKey="revenue"
                   stroke="#3b82f6"
                   strokeWidth={3}
-                  dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
+                  dot={{ fill: "#3b82f6", strokeWidth: 2, r: 5 }}
+                  activeDot={{ r: 7 }}
                 />
               </LineChart>
             </ResponsiveContainer>
