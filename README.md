@@ -1,4 +1,4 @@
-# BorNeo - MSME Business Intelligence & Loan System
+# BizView - MSME Business Intelligence & Loan System
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688)](https://fastapi.tiangolo.com/)
