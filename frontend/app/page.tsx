@@ -39,7 +39,11 @@ export default function Dashboard() {
 
   // derive display data
   const revenueData = analytics?.monthly_trend || []
-  const topProductsData = analytics?.top_products || []
+  // Reformat backend top_products (product, quantity_sold) to chart-friendly shape
+  const topProductsData = (analytics?.top_products || []).map((p: any) => ({
+    name: p.product,
+    sales: p.quantity_sold,
+  }))
 
   const kpiValues = {
     totalRevenue: analytics?.total_revenue || 0,
