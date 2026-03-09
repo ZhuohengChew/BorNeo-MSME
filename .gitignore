@@ -5,6 +5,8 @@ frontend/.next/
 # Python
 .venv/
 __pycache__/
+# Ignore the Python virtual environment
+backend/venv_310/
 
 # Env files
 .env
