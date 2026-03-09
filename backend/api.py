@@ -53,6 +53,29 @@ _sales_store: Dict[str, list] = {}      # business_id -> sales list
 loan_model = None
 scaler = StandardScaler()
 
+# Malaysian Holidays and Seasons for 2026
+MALAYSIAN_HOLIDAYS = {
+    "2026-03-21": {"name": "Hari Raya Puasa", "impact": 0.70},
+    "2026-03-22": {"name": "Hari Raya Puasa (2nd Day)", "impact": 0.65},
+    "2026-03-23": {"name": "Sultan of Johor's Birthday", "impact": 0.20},
+}
+
+# Seasonal patterns for Malaysia
+SEASONAL_BOOST = {
+    (1, 1): 0.10,    # January - New Year
+    (2, 1): 0.15,    # February - CNY prep
+    (3, 1): 0.05,    # March - Post-CNY
+    (4, 1): 0.20,    # April - Ramadan/Eid strong
+    (5, 1): 0.08,    # May
+    (6, 1): 0.05,    # June - Mid-year
+    (7, 1): 0.08,    # July - Mid-year
+    (8, 1): 0.12,    # August - Merdeka
+    (9, 1): 0.12,    # September - Malaysia Day
+    (10, 1): 0.10,   # October - Deepavali
+    (11, 1): 0.15,   # November - Holiday prep
+    (12, 1): 0.30,   # December - Year-end peak
+}
+
 # -----------  helpers to keep the rest of the code unchanged  -----------
 def _active_business() -> dict:
     """Return the active business profile dict (or empty dict)."""
@@ -163,31 +186,97 @@ def _calculate_revenue_stability():
     return 0.5
 
 def forecast_with_arima(days=30):
-    """ARIMA forecasting"""
+    """ARIMA forecasting with Malaysian holiday and seasonal adjustments"""
     sales = _get_sales()
+    print(f"DEBUG forecast_with_arima: sales count = {len(sales)}")
+    
     if not ARIMA_AVAILABLE or not sales:
+        print(f"DEBUG: ARIMA_AVAILABLE={ARIMA_AVAILABLE}, sales={len(sales) if sales else 0}")
         return None
 
     try:
         df = pd.DataFrame(sales)
+        print(f"DEBUG: DataFrame shape = {df.shape}")
+        print(f"DEBUG: Column names = {df.columns.tolist()}")
+        
         df['date'] = pd.to_datetime(df['date'])
 
+        # Group by date and sum revenue for each day
         forecast_input = df.groupby('date')['revenue'].sum().reset_index()
-        forecast_input = forecast_input.sort_values('date')
+        forecast_input = forecast_input.sort_values('date').reset_index(drop=True)
+        print(f"DEBUG: Forecast input shape = {forecast_input.shape}, date range = {forecast_input['date'].min()} to {forecast_input['date'].max()}")
 
         if len(forecast_input) < 7:
+            print(f"DEBUG: Not enough data - {len(forecast_input)} days")
             return None
 
-        model = ARIMA(forecast_input['revenue'], order=(1, 1, 1))
+        # Train ARIMA model on daily revenue
+        model = ARIMA(forecast_input['revenue'].values, order=(1, 1, 1))
         results = model.fit()
 
-        forecast = results.get_forecast(steps=days)
-        forecast_df = forecast.conf_int(alpha=0.2)
-        forecast_df['yhat'] = forecast.predicted_mean
+        # Get forecast with confidence intervals
+        forecast_result = results.get_forecast(steps=days)
+        forecast_mean = np.array(forecast_result.predicted_mean)
+        conf_int_df = forecast_result.conf_int(alpha=0.2)
+        forecast_ci = np.array(conf_int_df)
+        
+        print(f"DEBUG: Forecast mean shape = {forecast_mean.shape}, CI shape = {forecast_ci.shape}")
 
-        return forecast_df
+        # Build adjusted forecasts list
+        adjusted_forecasts = []
+        today = datetime.now()
+        
+        for i in range(days):
+            current_date = today + timedelta(days=i+1)
+            date_str = current_date.strftime("%Y-%m-%d")
+            
+            base_forecast = forecast_mean[i]
+            lower_ci = forecast_ci[i][0]
+            upper_ci = forecast_ci[i][1]
+            
+            adjustment = 1.0
+            
+            # Apply seasonal boost
+            month = current_date.month
+            seasonal = SEASONAL_BOOST.get((month, 1), 0)
+            adjustment *= (1 + seasonal)
+            
+            # Apply holiday impact
+            holiday_name = None
+            holiday_impact = 0
+            if date_str in MALAYSIAN_HOLIDAYS:
+                holiday_info = MALAYSIAN_HOLIDAYS[date_str]
+                holiday_name = holiday_info["name"]
+                holiday_impact = holiday_info["impact"]
+                adjustment *= (1 + holiday_impact)
+            
+            # Apply weekend boost
+            if current_date.weekday() >= 4:  # Friday and Saturday
+                adjustment *= 1.1
+            
+            adjusted_yhat = base_forecast * adjustment
+            adjusted_lower = lower_ci * adjustment
+            adjusted_upper = upper_ci * adjustment
+            
+            adjusted_forecasts.append({
+                'day': i + 1,
+                'yhat': float(adjusted_yhat),
+                'yhat_lower': float(adjusted_lower),
+                'yhat_upper': float(adjusted_upper),
+                'date': date_str,
+                'holiday': holiday_name,
+                'holiday_impact': holiday_impact,
+                'seasonal_boost': seasonal,
+                'is_weekend': current_date.weekday() >= 4
+            })
+        
+        print(f"DEBUG: Returning {len(adjusted_forecasts)} forecast items")
+        return adjusted_forecasts
 
-    except:
+    except Exception as e:
+        print(f"Forecast error: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 # Analytics functions
@@ -417,7 +506,7 @@ async def get_analytics():
                     'total_revenue': float(total_revenue),
                     'total_cost': float(total_cost),
                     'total_profit': float(total_profit),
-                    'profit_margin_%': round(profit_margin, 1),
+                    'profit_margin_': round(profit_margin, 1),
                     'price_unit': float(price_per_unit),
                     'cost_unit': float(cost_per_unit),
                     'stock': product.get('stock', 0)
@@ -437,15 +526,35 @@ async def get_analytics():
 
 @app.get("/api/forecast")
 async def get_forecast(days: int = 30):
-    """Get demand forecast"""
+    """Get demand forecast with holiday and seasonal adjustments"""
+    sales = _get_sales()
+    print(f"DEBUG: Getting forecast. Sales count: {len(sales)}, active_business_id: {active_business_id}")
+    
+    if not sales:
+        print("DEBUG: No sales data available")
+        return {"message": "Not enough data for forecasting", "debug": "No sales data"}
+    
     forecast = forecast_with_arima(days)
+    print(f"DEBUG: Forecast result: {forecast is not None}, items: {len(forecast) if forecast else 0}")
 
     if forecast is None:
-        return {"message": "Not enough data for forecasting"}
+        return {"message": "Not enough data for forecasting", "debug": "ARIMA failed"}
+
+    # Extract holidays from forecast
+    holidays = [
+        {
+            "date": item["date"],
+            "name": item["holiday"],
+            "sales_increase": f"{item['holiday_impact']*100:.0f}%"
+        }
+        for item in forecast
+        if item["holiday"] is not None
+    ]
 
     return {
-        "forecast": forecast.to_dict('records'),
-        "days": days
+        "forecast": forecast,
+        "days": days,
+        "holidays": holidays
     }
 
 @app.post("/api/simulation")
@@ -573,6 +682,8 @@ async def load_demo_data():
     _products_store[demo_id] = demo_products.copy()
     _sales_store[demo_id] = demo_sales.copy()
     active_business_id = demo_id
+    
+    print(f"DEBUG: Demo data loaded. demo_id={demo_id}, sales_count={len(_sales_store[demo_id])}, active_business_id={active_business_id}")
 
     return {
         'business_profile': demo_profile,
