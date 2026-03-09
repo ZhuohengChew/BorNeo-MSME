@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import axios from "axios"
+import { useBusiness } from "@/lib/business-context"
 
 interface AnalyticsData {
   total_revenue: number
@@ -28,20 +29,20 @@ interface AnalyticsData {
 
 export default function Analytics() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
-  const [businessProfile, setBusinessProfile] = useState<any | null>(null)
   const [anomalies, setAnomalies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { activeBusiness, loading: bizLoading } = useBusiness()
 
   useEffect(() => {
+    if (bizLoading) return
+    if (!activeBusiness) { setLoading(false); return }
     const fetchData = async () => {
       try {
-        const [analyticsRes, businessRes, anomaliesRes] = await Promise.all([
+        const [analyticsRes, anomaliesRes] = await Promise.all([
           axios.get("http://localhost:8000/api/analytics"),
-          axios.get("http://localhost:8000/api/business"),
           axios.get("http://localhost:8000/api/anomalies")
         ])
         setAnalytics(analyticsRes.data)
-        setBusinessProfile(businessRes.data)
         setAnomalies(anomaliesRes.data.anomalies || [])
       } catch (error) {
         console.error("Error fetching data:", error)
@@ -51,11 +52,11 @@ export default function Analytics() {
     }
 
     fetchData()
-  }, [])
+  }, [activeBusiness, bizLoading])
 
-  const isProfileComplete = businessProfile && businessProfile.business_name
+  const isProfileComplete = !!activeBusiness
 
-  if (loading) {
+  if (loading || bizLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">

@@ -3,17 +3,18 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useState, useEffect } from "react"
-import axios from "axios"
+import { useState } from "react"
+import { useBusiness } from "@/lib/business-context"
 import {
   BarChart3,
   Building2,
   CreditCard,
-  FileText,
+  ChevronDown,
+  Check,
   Home,
   LineChart,
   Package,
-  Settings,
+  Plus,
   TrendingUp,
   Upload,
   User,
@@ -32,19 +33,8 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const [businessProfile, setBusinessProfile] = useState<any | null>(null)
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get("/api/business")
-        setBusinessProfile(res.data)
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    fetchProfile()
-  }, [])
+  const { activeBusiness, businesses, switchBusiness } = useBusiness()
+  const [switcherOpen, setSwitcherOpen] = useState(false)
 
   return (
     <div className="flex h-full w-64 flex-col bg-white border-r border-gray-200">
@@ -60,6 +50,58 @@ export function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Business Switcher */}
+      {businesses.length > 0 && (
+        <div className="border-b border-gray-200 px-4 py-3">
+          <div className="relative">
+            <button
+              onClick={() => setSwitcherOpen(!switcherOpen)}
+              className="flex w-full items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-left text-sm font-medium text-blue-900 hover:bg-blue-100 transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Building2 className="h-4 w-4 shrink-0 text-blue-600" />
+                <span className="truncate">{activeBusiness?.business_name ?? "Select Business"}</span>
+              </div>
+              <ChevronDown className={cn("h-4 w-4 shrink-0 text-blue-600 transition-transform", switcherOpen && "rotate-180")} />
+            </button>
+
+            {switcherOpen && (
+              <div className="absolute left-0 right-0 z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg">
+                <div className="py-1 max-h-48 overflow-y-auto">
+                  {businesses.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => { switchBusiness(b.id); setSwitcherOpen(false); }}
+                      className={cn(
+                        "flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
+                        b.id === activeBusiness?.id ? "text-blue-700 font-medium bg-blue-50/50" : "text-gray-700"
+                      )}
+                    >
+                      {b.id === activeBusiness?.id ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+                      ) : (
+                        <span className="w-3.5" />
+                      )}
+                      <span className="truncate">{b.business_name}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-gray-100">
+                  <Link
+                    href="/business"
+                    onClick={() => setSwitcherOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Register New Business
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-4 py-6">
@@ -94,10 +136,10 @@ export function Sidebar() {
               </p>
             </div>
             <p className="text-sm font-medium text-gray-900 truncate">
-              {businessProfile?.business_name || "Not Registered"}
+              {activeBusiness?.business_name || "Not Registered"}
             </p>
             <p className="text-xs text-gray-500 truncate">
-              {businessProfile?.business_type || "Complete Registration"}
+              {activeBusiness?.business_type || "Complete Registration"}
             </p>
           </div>
         </Link>

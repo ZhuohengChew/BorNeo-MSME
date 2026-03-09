@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import axios from "axios"
 import { Plus, ShoppingCart, Package, TrendingUp } from "lucide-react"
+import { useBusiness } from "@/lib/business-context"
 
 interface Product {
   name: string
@@ -29,8 +30,8 @@ interface Sale {
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
   const [sales, setSales] = useState<Sale[]>([])
-  const [businessProfile, setBusinessProfile] = useState<any | null>(null)
   const [loading, setLoading] = useState(false)
+  const { activeBusiness, loading: bizLoading, refresh } = useBusiness()
 
   // Form states
   const [newProduct, setNewProduct] = useState({
@@ -48,17 +49,15 @@ export default function POS() {
   })
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (!bizLoading && activeBusiness) fetchData()
+  }, [activeBusiness, bizLoading])
 
   const fetchData = async () => {
     try {
-      const [profileRes, productsRes, salesRes] = await Promise.all([
-        axios.get("/api/business"),
+      const [productsRes, salesRes] = await Promise.all([
         axios.get("/api/products"),
         axios.get("/api/sales")
       ])
-      setBusinessProfile(profileRes.data)
       setProducts(productsRes.data)
       setSales(salesRes.data)
     } catch (e) {
@@ -72,7 +71,7 @@ export default function POS() {
       const resp = await axios.post("/api/demo")
       setProducts(resp.data.products)
       setSales(resp.data.sales)
-      setBusinessProfile(resp.data.business_profile)
+      await refresh()
     } catch (err) {
       console.error("failed to load demo", err)
     } finally {
@@ -156,7 +155,17 @@ export default function POS() {
     }
   }
 
-  const isProfileComplete = businessProfile && businessProfile.business_name
+  const isProfileComplete = !!activeBusiness
+
+  if (bizLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   if (!isProfileComplete) {
     return (

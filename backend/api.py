@@ -41,11 +41,36 @@ async def log_requests(request, call_next):
     return response
 
 # In-memory storage (in production, use database)
-business_data = {}
-products_data = []
-sales_data = []
+import uuid as _uuid
+
+businesses: List[Dict] = []          # list of business profiles, each has an 'id' key
+active_business_id: Optional[str] = None  # currently selected business id
+
+# Per-business data keyed by business id
+_products_store: Dict[str, list] = {}   # business_id -> products list
+_sales_store: Dict[str, list] = {}      # business_id -> sales list
+
 loan_model = None
 scaler = StandardScaler()
+
+# -----------  helpers to keep the rest of the code unchanged  -----------
+def _active_business() -> dict:
+    """Return the active business profile dict (or empty dict)."""
+    global active_business_id
+    if not active_business_id:
+        return {}
+    for b in businesses:
+        if b['id'] == active_business_id:
+            return b
+    return {}
+
+def _get_products() -> list:
+    return _products_store.get(active_business_id or '', [])
+
+def _get_sales() -> list:
+    return _sales_store.get(active_business_id or '', [])
+
+
 
 # Pydantic models
 class BusinessProfile(BaseModel):
@@ -55,6 +80,7 @@ class BusinessProfile(BaseModel):
     monthly_revenue: float
     profit_margin: float
     existing_loan_commitment: float
+    id: Optional[str] = None  # assigned by server
 
 class Product(BaseModel):
     name: str
@@ -78,17 +104,18 @@ class LoanScore(BaseModel):
 # ML Functions
 def train_loan_model():
     """Train Random Forest model for loan scoring"""
-    if len(sales_data) < 20:
+    sales = _get_sales()
+    if len(sales) < 20:
         return False
 
     try:
         global loan_model, scaler
 
         # Prepare training features
-        df = pd.DataFrame(sales_data)
+        df = pd.DataFrame(sales)
         df['date'] = pd.to_datetime(df['date'])
 
-        profile = business_data
+        profile = _active_business()
 
         # Feature engineering
         features = {
@@ -97,8 +124,8 @@ def train_loan_model():
             'years_operating': [profile.get('years_operating', 0)],
             'monthly_revenue': [profile.get('monthly_revenue', 0)],
             'existing_commitment': [profile.get('existing_loan_commitment', 0)],
-            'num_products': [len(products_data)],
-            'num_sales': [len(sales_data)],
+            'num_products': [len(_get_products())],
+            'num_sales': [len(sales)],
             'revenue_stability': [_calculate_revenue_stability()],
         }
 
@@ -122,10 +149,11 @@ def train_loan_model():
 
 def _calculate_revenue_stability():
     """Calculate revenue stability"""
-    if not sales_data:
+    sales = _get_sales()
+    if not sales:
         return 0
 
-    df = pd.DataFrame(sales_data)
+    df = pd.DataFrame(sales)
     df['date'] = pd.to_datetime(df['date'])
     daily_revenue = df.groupby('date')['revenue'].sum()
 
@@ -136,11 +164,12 @@ def _calculate_revenue_stability():
 
 def forecast_with_arima(days=30):
     """ARIMA forecasting"""
-    if not ARIMA_AVAILABLE or not sales_data:
+    sales = _get_sales()
+    if not ARIMA_AVAILABLE or not sales:
         return None
 
     try:
-        df = pd.DataFrame(sales_data)
+        df = pd.DataFrame(sales)
         df['date'] = pd.to_datetime(df['date'])
 
         forecast_input = df.groupby('date')['revenue'].sum().reset_index()
@@ -164,17 +193,19 @@ def forecast_with_arima(days=30):
 # Analytics functions
 def calculate_total_revenue():
     """Calculate total revenue"""
-    if not sales_data:
+    sales = _get_sales()
+    if not sales:
         return 0
-    df = pd.DataFrame(sales_data)
+    df = pd.DataFrame(sales)
     return df['revenue'].sum()
 
 def calculate_monthly_trend():
     """Calculate monthly revenue trend"""
-    if not sales_data:
+    sales = _get_sales()
+    if not sales:
         return []
 
-    df = pd.DataFrame(sales_data)
+    df = pd.DataFrame(sales)
     df['date'] = pd.to_datetime(df['date'])
     monthly = df.groupby(df['date'].dt.to_period('M'))['revenue'].sum()
     monthly.index = monthly.index.to_timestamp()
@@ -183,24 +214,26 @@ def calculate_monthly_trend():
 
 def calculate_top_products(top_n=5):
     """Get top selling products"""
-    if not sales_data:
+    sales = _get_sales()
+    if not sales:
         return []
 
-    df = pd.DataFrame(sales_data)
+    df = pd.DataFrame(sales)
     top = df.groupby('product')['quantity'].sum().nlargest(top_n).reset_index()
     top.columns = ['product', 'quantity_sold']
     return top.to_dict('records')
 
 def calculate_loan_score():
     """Calculate loan eligibility score"""
+    sales = _get_sales()
     # Try to train model if we have enough data
-    if loan_model is None and len(sales_data) >= 20:
+    if loan_model is None and len(sales) >= 20:
         train_loan_model()
 
     # Use ML model if trained
     if loan_model is not None:
         try:
-            profile = business_data
+            profile = _active_business()
 
             features = {
                 'total_revenue': [calculate_total_revenue()],
@@ -208,8 +241,8 @@ def calculate_loan_score():
                 'years_operating': [profile.get('years_operating', 0)],
                 'monthly_revenue': [profile.get('monthly_revenue', 0)],
                 'existing_commitment': [profile.get('existing_loan_commitment', 0)],
-                'num_products': [len(products_data)],
-                'num_sales': [len(sales_data)],
+                'num_products': [len(_get_products())],
+                'num_sales': [len(sales)],
                 'revenue_stability': [_calculate_revenue_stability()],
             }
 
@@ -222,10 +255,11 @@ def calculate_loan_score():
             pass
 
     # Fallback: Rule-based scoring
+    biz = _active_business()
     total_revenue = calculate_total_revenue()
-    profit_margin = business_data.get('profit_margin', 0)
-    monthly_revenue = business_data.get('monthly_revenue', 0)
-    existing_commitment = business_data.get('existing_loan_commitment', 0)
+    profit_margin = biz.get('profit_margin', 0)
+    monthly_revenue = biz.get('monthly_revenue', 0)
+    existing_commitment = biz.get('existing_loan_commitment', 0)
 
     revenue_stability = _calculate_revenue_stability()
 
@@ -255,37 +289,84 @@ def calculate_loan_score():
 # API Endpoints
 @app.post("/api/business")
 async def create_business(profile: BusinessProfile):
-    """Create or update business profile"""
-    global business_data
-    business_data = profile.dict()
-    return {"message": "Business profile saved successfully", "data": business_data}
+    """Create a new business profile (or update if id provided)"""
+    global active_business_id
+    data = profile.dict()
+
+    if data.get('id'):
+        # Update existing
+        for i, b in enumerate(businesses):
+            if b['id'] == data['id']:
+                businesses[i] = data
+                return {"message": "Business profile updated successfully", "data": data}
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Create new
+    new_id = str(_uuid.uuid4())[:8]
+    data['id'] = new_id
+    businesses.append(data)
+    # Initialise per-business stores
+    _products_store[new_id] = []
+    _sales_store[new_id] = []
+    # Auto-activate if it's the first business or no active business
+    if active_business_id is None or len(businesses) == 1:
+        active_business_id = new_id
+    return {"message": "Business profile created successfully", "data": data}
 
 @app.get("/api/business")
 async def get_business():
-    """Get business profile"""
-    return business_data
+    """Get the active business profile"""
+    return _active_business()
+
+@app.get("/api/businesses")
+async def get_all_businesses():
+    """Get all registered businesses"""
+    return {"businesses": businesses, "active_id": active_business_id}
+
+@app.put("/api/businesses/{business_id}/activate")
+async def activate_business(business_id: str):
+    """Set a business as the active one"""
+    global active_business_id
+    for b in businesses:
+        if b['id'] == business_id:
+            active_business_id = business_id
+            return {"message": f"Switched to {b['business_name']}", "data": b}
+    raise HTTPException(status_code=404, detail="Business not found")
+
+@app.delete("/api/businesses/{business_id}")
+async def delete_business(business_id: str):
+    """Delete a business profile"""
+    global active_business_id, businesses
+    businesses = [b for b in businesses if b['id'] != business_id]
+    _products_store.pop(business_id, None)
+    _sales_store.pop(business_id, None)
+    if active_business_id == business_id:
+        active_business_id = businesses[0]['id'] if businesses else None
+    return {"message": "Business deleted"}
 
 @app.post("/api/products")
 async def create_product(product: Product):
     """Add new product"""
-    products_data.append(product.dict())
+    products = _get_products()
+    products.append(product.dict())
     return {"message": "Product added successfully", "data": product.dict()}
 
 @app.get("/api/products")
 async def get_products():
     """Get all products"""
-    return products_data
+    return _get_products()
 
 @app.post("/api/sales")
 async def create_sale(sale: Sale):
     """Record a sale"""
-    sales_data.append(sale.dict())
+    sales = _get_sales()
+    sales.append(sale.dict())
     return {"message": "Sale recorded successfully", "data": sale.dict()}
 
 @app.get("/api/sales")
 async def get_sales():
     """Get all sales"""
-    return sales_data
+    return _get_sales()
 
 @app.post("/api/upload-csv")
 async def upload_csv(file: UploadFile = File(...)):
@@ -300,9 +381,9 @@ async def upload_csv(file: UploadFile = File(...)):
         if not all(col in df.columns for col in required_columns):
             raise HTTPException(status_code=400, detail="CSV must contain columns: product, quantity, date, revenue")
 
-        # Convert to dict and add to sales_data
+        # Convert to dict and add to sales
         new_sales = df.to_dict('records')
-        sales_data.extend(new_sales)
+        _get_sales().extend(new_sales)
 
         return {"message": f"Successfully uploaded {len(new_sales)} sales records"}
 
@@ -314,9 +395,11 @@ async def get_analytics():
     """Get analytics data"""
     # Product performance analysis
     product_performance = []
-    if sales_data and products_data:
-        df = pd.DataFrame(sales_data)
-        for product in products_data:
+    sales = _get_sales()
+    products = _get_products()
+    if sales and products:
+        df = pd.DataFrame(sales)
+        for product in products:
             product_sales = df[df['product'] == product['name']]
             if not product_sales.empty:
                 total_quantity = product_sales['quantity'].sum()
@@ -347,8 +430,8 @@ async def get_analytics():
         "total_revenue": calculate_total_revenue(),
         "monthly_trend": calculate_monthly_trend(),
         "top_products": calculate_top_products(),
-        "total_products": len(products_data),
-        "total_sales": len(sales_data),
+        "total_products": len(_get_products()),
+        "total_sales": len(_get_sales()),
         "product_performance": product_performance
     }
 
@@ -385,11 +468,11 @@ async def run_simulation(scenario: Dict):
 @app.get("/api/anomalies")
 async def get_anomalies():
     """Detect sales anomalies using Isolation Forest"""
-    if len(sales_data) < 5:
+    if len(_get_sales()) < 5:
         return {"anomalies": [], "message": "Not enough data for anomaly detection"}
     
     try:
-        df = pd.DataFrame(sales_data)
+        df = pd.DataFrame(_get_sales())
         
         # Features for anomaly detection
         X = df[['quantity', 'revenue']].values
@@ -425,7 +508,7 @@ async def get_loan_score():
     score = calculate_loan_score()
 
     # Calculate max loan amount based on score
-    monthly_revenue = business_data.get('monthly_revenue', 0)
+    monthly_revenue = _active_business().get('monthly_revenue', 0)
     max_loan = min(monthly_revenue * 12 * score * 2, 5000000)  # Cap at 5M
 
     eligibility = "Eligible" if score >= 0.5 else "Not Eligible"
@@ -445,10 +528,12 @@ async def get_loan_score():
 @app.post("/api/demo")
 async def load_demo_data():
     """Seed the server with sample business profile, products, and sales data."""
-    global business_data, products_data, sales_data
+    global active_business_id
 
     # business profile sample
+    demo_id = "demo0001"
     demo_profile = {
+        'id': demo_id,
         'business_name': 'Nasi Kuah Corner',
         'business_type': 'FNB (Food & Beverage)',
         'years_operating': 3,
@@ -478,14 +563,21 @@ async def load_demo_data():
         demo_sales.append({'product': 'Ais Kosong', 'quantity': ais_sales[i], 'date': dt, 'revenue': ais_sales[i]*1.0})
         demo_sales.append({'product': 'ABC', 'quantity': abc_sales[i], 'date': dt, 'revenue': abc_sales[i]*6.0})
 
-    business_data = demo_profile
-    products_data = demo_products.copy()
-    sales_data = demo_sales.copy()
+    # Remove previous demo business if it exists
+    for i, b in enumerate(businesses):
+        if b['id'] == demo_id:
+            businesses.pop(i)
+            break
+
+    businesses.append(demo_profile)
+    _products_store[demo_id] = demo_products.copy()
+    _sales_store[demo_id] = demo_sales.copy()
+    active_business_id = demo_id
 
     return {
-        'business_profile': business_data,
-        'products': products_data,
-        'sales': sales_data
+        'business_profile': demo_profile,
+        'products': demo_products,
+        'sales': demo_sales
     }
 
 if __name__ == "__main__":

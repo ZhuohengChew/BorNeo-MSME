@@ -1,30 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react"
 import axios from "axios"
+import { useBusiness } from "@/lib/business-context"
 
 export default function CSVUpload() {
-  const [businessProfile, setBusinessProfile] = useState<any | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<any>(null)
   const [error, setError] = useState<string>("")
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get("/api/business")
-        setBusinessProfile(res.data)
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    fetchProfile()
-  }, [])
+  const { activeBusiness, loading: bizLoading } = useBusiness()
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -64,7 +53,17 @@ export default function CSVUpload() {
     }
   }
 
-  const isProfileComplete = businessProfile && businessProfile.business_name
+  const isProfileComplete = !!activeBusiness
+
+  if (bizLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   if (!isProfileComplete) {
     return (

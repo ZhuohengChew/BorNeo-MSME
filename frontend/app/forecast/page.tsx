@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts"
 import axios from "axios"
 import { TrendingUp, Calendar } from "lucide-react"
+import { useBusiness } from "@/lib/business-context"
 
 interface ForecastData {
   forecast: Array<{
@@ -19,25 +20,22 @@ interface ForecastData {
 
 export default function Forecast() {
   const [forecast, setForecast] = useState<ForecastData | null>(null)
-  const [businessProfile, setBusinessProfile] = useState<any | null>(null)
   const [loading, setLoading] = useState(false)
+  const { activeBusiness, loading: bizLoading } = useBusiness()
 
   useEffect(() => {
+    if (bizLoading || !activeBusiness) return
     const fetchData = async () => {
       try {
-        const [forecastRes, businessRes] = await Promise.all([
-          axios.get("http://localhost:8000/api/forecast"),
-          axios.get("http://localhost:8000/api/business")
-        ])
-        setForecast(forecastRes.data)
-        setBusinessProfile(businessRes.data)
+        const res = await axios.get("http://localhost:8000/api/forecast")
+        setForecast(res.data)
       } catch (error) {
         console.error("Error fetching data:", error)
         setForecast(null)
       }
     }
     fetchData()
-  }, [])
+  }, [activeBusiness, bizLoading])
 
   const fetchForecast = async () => {
     setLoading(true)
@@ -52,7 +50,17 @@ export default function Forecast() {
     }
   }
 
-  const isProfileComplete = businessProfile && businessProfile.business_name
+  const isProfileComplete = !!activeBusiness
+
+  if (bizLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   if (!isProfileComplete) {
     return (

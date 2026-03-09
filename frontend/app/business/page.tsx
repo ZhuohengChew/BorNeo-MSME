@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import axios from "axios"
+import { useBusiness } from "@/lib/business-context"
+import { Building2, Check, Trash2 } from "lucide-react"
 
 export default function BusinessRegistration() {
+  const { businesses, activeBusiness, switchBusiness, refresh } = useBusiness()
   const [formData, setFormData] = useState({
     business_name: "",
     business_type: "",
@@ -26,8 +29,17 @@ export default function BusinessRegistration() {
     setLoading(true)
 
     try {
-      const response = await axios.post("/api/business", formData)
-      setMessage("Business profile saved successfully!")
+      await axios.post("/api/business", formData)
+      setMessage("Business profile created successfully!")
+      setFormData({
+        business_name: "",
+        business_type: "",
+        years_operating: 0,
+        monthly_revenue: 0,
+        profit_margin: 0,
+        existing_loan_commitment: 0
+      })
+      await refresh()
     } catch (error) {
       setMessage("Error saving business profile")
     } finally {
@@ -47,12 +59,30 @@ export default function BusinessRegistration() {
     try {
       const resp = await axios.post("/api/demo")
       const profile = resp.data.business_profile
-      setFormData(profile)
+      setFormData({
+        business_name: profile.business_name,
+        business_type: profile.business_type,
+        years_operating: profile.years_operating,
+        monthly_revenue: profile.monthly_revenue,
+        profit_margin: profile.profit_margin,
+        existing_loan_commitment: profile.existing_loan_commitment,
+      })
       setMessage("Demo profile loaded from server!")
+      await refresh()
     } catch (err) {
       setMessage("Failed to load demo data")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const deleteBusiness = async (id: string) => {
+    try {
+      await axios.delete(`/api/businesses/${id}`)
+      await refresh()
+      setMessage("Business deleted.")
+    } catch {
+      setMessage("Failed to delete business")
     }
   }
 
@@ -62,8 +92,56 @@ export default function BusinessRegistration() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Business Registration</h1>
-          <p className="text-gray-600 mt-2">Set up your business profile to get started with analytics and loan assessment.</p>
+          <p className="text-gray-600 mt-2">Register a new business or manage your existing businesses.</p>
         </div>
+
+        {/* Existing Businesses */}
+        {businesses.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Businesses</CardTitle>
+              <CardDescription>
+                You have {businesses.length} registered business{businesses.length > 1 ? "es" : ""}. Select one to set it as active.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {businesses.map((b) => (
+                  <div
+                    key={b.id}
+                    className={`flex items-center justify-between rounded-lg border p-3 transition-colors ${
+                      b.id === activeBusiness?.id
+                        ? "border-blue-300 bg-blue-50"
+                        : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <button
+                      onClick={() => switchBusiness(b.id)}
+                      className="flex items-center gap-3 flex-1 text-left"
+                    >
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        b.id === activeBusiness?.id ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-600"
+                      }`}>
+                        {b.id === activeBusiness?.id ? <Check className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{b.business_name}</p>
+                        <p className="text-xs text-gray-500">{b.business_type} &middot; RM {b.monthly_revenue.toLocaleString()}/mo</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => deleteBusiness(b.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded"
+                      title="Delete business"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Demo button */}
         <div className="mt-4">
@@ -72,7 +150,7 @@ export default function BusinessRegistration() {
             onClick={loadDemo}
             disabled={loading}
           >
-            🎬 Load Demo Data
+            Load Demo Data
           </Button>
         </div>
 
