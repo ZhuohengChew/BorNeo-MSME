@@ -8,23 +8,22 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 import { useState, useEffect } from "react"
 import axios from "axios"
+import { useBusiness } from "@/lib/business-context"
 
 // state initializers will live inside component
 
 export default function Dashboard() {
   const [analytics, setAnalytics] = useState<any | null>(null)
-  const [businessProfile, setBusinessProfile] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
+  const { activeBusiness, loading: bizLoading } = useBusiness()
 
   useEffect(() => {
+    if (bizLoading) return
+    if (!activeBusiness) { setLoading(false); return }
     const fetch = async () => {
       try {
-        const [analyticsRes, businessRes] = await Promise.all([
-          axios.get("/api/analytics"),
-          axios.get("/api/business")
-        ])
-        setAnalytics(analyticsRes.data)
-        setBusinessProfile(businessRes.data)
+        const res = await axios.get("/api/analytics")
+        setAnalytics(res.data)
       } catch (e) {
         console.error(e)
       } finally {
@@ -32,10 +31,10 @@ export default function Dashboard() {
       }
     }
     fetch()
-  }, [])
+  }, [activeBusiness, bizLoading])
 
   // Check if business profile is complete
-  const isProfileComplete = businessProfile && businessProfile.business_name
+  const isProfileComplete = !!activeBusiness
 
   // derive display data
   const revenueData = analytics?.monthly_trend || []
@@ -52,7 +51,7 @@ export default function Dashboard() {
     totalSales: analytics?.total_sales || 0,
   }
 
-  if (loading) {
+  if (loading || bizLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">

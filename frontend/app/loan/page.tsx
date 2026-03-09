@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress"
 import axios from "axios"
 import { CheckCircle, XCircle, AlertCircle, CreditCard, TrendingUp, Building2, DollarSign } from "lucide-react"
+import { useBusiness } from "@/lib/business-context"
 
 interface LoanScore {
   score: number
@@ -32,10 +33,10 @@ interface LoanProvider {
 
 export default function LoanCenter() {
   const [loanScore, setLoanScore] = useState<LoanScore | null>(null)
-  const [businessProfile, setBusinessProfile] = useState<any | null>(null)
   const [loading, setLoading] = useState(false)
   const [selectedProgram, setSelectedProgram] = useState<any>(null)
   const [showApplication, setShowApplication] = useState(false)
+  const { activeBusiness, loading: bizLoading } = useBusiness()
 
   // Application form state
   const [applicationData, setApplicationData] = useState({
@@ -54,20 +55,17 @@ export default function LoanCenter() {
   })
 
   useEffect(() => {
+    if (bizLoading || !activeBusiness) return
     const fetchData = async () => {
       try {
-        const [loanRes, businessRes] = await Promise.all([
-          axios.get("/api/loan-score"),
-          axios.get("/api/business")
-        ])
-        setLoanScore(loanRes.data)
-        setBusinessProfile(businessRes.data)
+        const res = await axios.get("/api/loan-score")
+        setLoanScore(res.data)
       } catch (error) {
         console.error("Error fetching data:", error)
       }
     }
     fetchData()
-  }, [])
+  }, [activeBusiness, bizLoading])
 
   const fetchLoanScore = async () => {
     setLoading(true)
@@ -87,13 +85,13 @@ export default function LoanCenter() {
 
     // Auto-fill application form
     setApplicationData({
-      applicant_name: businessProfile?.business_name || "",
+      applicant_name: activeBusiness?.business_name || "",
       applicant_ic: "",
       business_registration_number: "",
       loan_amount: program.max_amount.toString(),
       loan_purpose: "Business expansion and working capital",
-      monthly_income: businessProfile?.monthly_revenue?.toString() || "",
-      existing_debts: businessProfile?.existing_loan_commitment?.toString() || "",
+      monthly_income: activeBusiness?.monthly_revenue?.toString() || "",
+      existing_debts: activeBusiness?.existing_loan_commitment?.toString() || "",
       collateral_details: "",
       guarantor_name: "",
       guarantor_ic: "",
@@ -109,7 +107,17 @@ export default function LoanCenter() {
     setSelectedProgram(null)
   }
 
-  const isProfileComplete = businessProfile && businessProfile.business_name
+  const isProfileComplete = !!activeBusiness
+
+  if (bizLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   if (!isProfileComplete) {
     return (

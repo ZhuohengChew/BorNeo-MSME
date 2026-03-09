@@ -6,25 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import axios from "axios"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useBusiness } from "@/lib/business-context"
 
 export default function Simulation() {
   const [analytics, setAnalytics] = useState<any | null>(null)
-  const [businessProfile, setBusinessProfile] = useState<any | null>(null)
   const [loading, setLoading] = useState(false)
   const [discountPct, setDiscountPct] = useState([0])
   const [boostPct, setBoostPct] = useState([0])
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get("/api/business")
-        setBusinessProfile(res.data)
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    fetchProfile()
-  }, [])
+  const { activeBusiness, loading: bizLoading } = useBusiness()
 
   const loadDemo = async () => {
     setLoading(true)
@@ -39,7 +28,17 @@ export default function Simulation() {
     }
   }
 
-  const isProfileComplete = businessProfile && businessProfile.business_name
+  const isProfileComplete = !!activeBusiness
+
+  if (bizLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   if (!isProfileComplete) {
     return (
@@ -63,7 +62,7 @@ export default function Simulation() {
   }
 
   const currentRevenue = analytics ? analytics.total_revenue : 0
-  const profitMargin = businessProfile?.profit_margin || 30
+  const profitMargin = activeBusiness?.profit_margin || 30
   const currentProfit = currentRevenue * (profitMargin / 100)
 
   // Calculate simulation

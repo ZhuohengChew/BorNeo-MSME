@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import axios from "axios"
+import { useBusiness } from "@/lib/business-context"
 
-export default function BusinessProfile() {
+export default function BusinessProfilePage() {
+  const { activeBusiness, loading: bizLoading, refresh } = useBusiness()
   const [formData, setFormData] = useState({
     business_name: "",
     business_type: "",
@@ -23,27 +25,28 @@ export default function BusinessProfile() {
   const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get("/api/business")
-        if (res.data && res.data.business_name) {
-          setFormData(res.data)
-        }
-      } catch (e) {
-        console.error(e)
-      }
+    if (activeBusiness) {
+      setFormData({
+        business_name: activeBusiness.business_name,
+        business_type: activeBusiness.business_type,
+        years_operating: activeBusiness.years_operating,
+        monthly_revenue: activeBusiness.monthly_revenue,
+        profit_margin: activeBusiness.profit_margin,
+        existing_loan_commitment: activeBusiness.existing_loan_commitment,
+      })
     }
-    fetchProfile()
-  }, [])
+  }, [activeBusiness])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      const response = await axios.post("/api/business", formData)
+      const payload = activeBusiness ? { ...formData, id: activeBusiness.id } : formData
+      await axios.post("/api/business", payload)
       setMessage("Business profile updated successfully!")
       setIsEditing(false)
+      await refresh()
     } catch (error) {
       setMessage("Error updating business profile")
     } finally {
