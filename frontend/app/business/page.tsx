@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import axios from "axios"
@@ -195,48 +196,48 @@ export default function BusinessRegistration() {
 
                 <div className="space-y-2">
                   <Label htmlFor="years_operating">Years Operating</Label>
-                  <Input
+                  <NumericInput
                     id="years_operating"
-                    type="number"
                     placeholder="0"
                     value={formData.years_operating}
-                    onChange={(e) => handleChange("years_operating", parseInt(e.target.value) || 0)}
+                    onChange={(v) => handleChange("years_operating", v)}
+                    allowDecimal={false}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="monthly_revenue">Monthly Revenue (RM)</Label>
-                  <Input
+                  <Label htmlFor="monthly_revenue">Monthly Revenue</Label>
+                  <NumericInput
                     id="monthly_revenue"
-                    type="number"
+                    prefix="RM"
                     placeholder="0"
                     value={formData.monthly_revenue}
-                    onChange={(e) => handleChange("monthly_revenue", parseFloat(e.target.value) || 0)}
+                    onChange={(v) => handleChange("monthly_revenue", v)}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="profit_margin">Profit Margin (%)</Label>
-                  <Input
+                  <Label htmlFor="profit_margin">Profit Margin</Label>
+                  <NumericInput
                     id="profit_margin"
-                    type="number"
+                    suffix="%"
                     placeholder="0"
                     value={formData.profit_margin}
-                    onChange={(e) => handleChange("profit_margin", parseFloat(e.target.value) || 0)}
+                    onChange={(v) => handleChange("profit_margin", v)}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="existing_loan_commitment">Existing Loan Commitment (RM)</Label>
-                  <Input
+                  <Label htmlFor="existing_loan_commitment">Existing Loan Commitment</Label>
+                  <NumericInput
                     id="existing_loan_commitment"
-                    type="number"
+                    prefix="RM"
                     placeholder="0"
                     value={formData.existing_loan_commitment}
-                    onChange={(e) => handleChange("existing_loan_commitment", parseFloat(e.target.value) || 0)}
+                    onChange={(v) => handleChange("existing_loan_commitment", v)}
                   />
                 </div>
               </div>
