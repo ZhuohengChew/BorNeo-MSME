@@ -115,18 +115,30 @@ export default function Forecast() {
                 <XAxis dataKey="day" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value, name) => [
-                    `RM ${Number(value).toLocaleString()}`,
-                    name === 'forecast' ? 'Forecast' : name === 'upper' ? 'Upper Bound' : 'Lower Bound'
-                  ]}
-                />
+                labelFormatter={(label) => `Day ${label}`}
+  contentStyle={{ 
+    backgroundColor: '#ffffff', 
+    border: '1px solid #cbd5e1', // A slate-300 border
+    borderRadius: '8px',
+    padding: '10px'
+  }}
+  itemStyle={{ 
+    color: '#000000', // Forces "Upper Bound", "Forecast", etc. to be Black
+    fontWeight: 'bold',
+    fontSize: '14px'
+  }}
+  formatter={(value, name) => [
+    `RM ${Number(value).toLocaleString()}`,
+    name === 'forecast' ? 'Forecast' : name === 'upper' ? 'Upper Bound' : 'Lower Bound'
+  ]}
+/>
                 <Area
                   type="monotone"
                   dataKey="upper"
                   stackId="1"
                   stroke="none"
-                  fill="#e0f2fe"
-                  fillOpacity={0.3}
+                  fill="#93c5fd"
+                  fillOpacity={0.5}
                 />
                 <Area
                   type="monotone"
@@ -139,9 +151,9 @@ export default function Forecast() {
                 <Line
                   type="monotone"
                   dataKey="forecast"
-                  stroke="#3b82f6"
+                  stroke="#1d4ed8"
                   strokeWidth={3}
-                  dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
+                  dot={{ fill: "#1d4ed8", strokeWidth: 2, r: 4 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -156,7 +168,7 @@ export default function Forecast() {
                 <div className="text-2xl font-bold text-blue-600">
                   RM 45,230
                 </div>
-                <div className="text-gray-600">Average Daily Forecast</div>
+                <div className="text-slate-800">Average Daily Forecast</div>
                 <div className="text-sm text-green-600 mt-1">+8.5% from current</div>
               </div>
             </CardContent>
@@ -168,7 +180,7 @@ export default function Forecast() {
                 <div className="text-2xl font-bold text-green-600">
                   RM 1,356,900
                 </div>
-                <div className="text-gray-600">30-Day Total Forecast</div>
+                <div className="text-slate-800">30-Day Total Forecast</div>
                 <div className="text-sm text-blue-600 mt-1">80% confidence interval</div>
               </div>
             </CardContent>
@@ -180,8 +192,8 @@ export default function Forecast() {
                 <div className="text-2xl font-bold text-purple-600">
                   +12.3%
                 </div>
-                <div className="text-gray-600">Growth Trend</div>
-                <div className="text-sm text-gray-500 mt-1">Next 30 days</div>
+                <div className="text-slate-800">Growth Trend</div>
+                <div className="text-sm text-slate-500 mt-1">Next 30 days</div>
               </div>
             </CardContent>
           </Card>
