@@ -122,10 +122,10 @@ export default function Forecast() {
       let holiday: string | undefined = undefined
       let holiday_impact = 0
       if (dateStr === '2026-03-21') {
-        holiday = 'Hari Raya Puasa'
+        holiday = 'Hari Raya '
         holiday_impact = 0.70
       } else if (dateStr === '2026-03-22') {
-        holiday = 'Hari Raya Puasa (2nd Day)'
+        holiday = 'Hari Raya (2nd Day)'
         holiday_impact = 0.65
       } else if (dateStr === '2026-03-23') {
         holiday = "Sultan of Johor's Birthday"
