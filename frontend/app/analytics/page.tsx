@@ -87,15 +87,16 @@ export default function Analytics() {
     )
   }
 
-  // Mock data for pie chart
-  // Mock data for pie chart
-  const revenueComposition = [
-    { name: "Product A", value: 35, color: "#3b82f6" },
-    { name: "Product B", value: 25, color: "#8b5cf6" },
-    { name: "Product C", value: 20, color: "#06b6d4" },
-    { name: "Product D", value: 12, color: "#10b981" },
-    { name: "Others", value: 8, color: "#f59e0b" },
-  ]
+  const COLORS = ["#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#14b8a6"]
+
+  const revenueComposition = (analytics?.product_performance || []).map((p, i) => {
+    const totalRevenue = analytics!.product_performance!.reduce((sum, x) => sum + x.total_revenue, 0)
+    return {
+      name: p.product,
+      value: totalRevenue > 0 ? parseFloat(((p.total_revenue / totalRevenue) * 100).toFixed(1)) : 0,
+      color: COLORS[i % COLORS.length],
+    }
+  })
 
   return (
     <DashboardLayout>
@@ -105,31 +106,6 @@ export default function Analytics() {
           <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
           <p className="text-gray-600 mt-2">Deep insights into your business performance.</p>
         </div>
-
-        {/* Revenue Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue Trend Analysis</CardTitle>
-            <CardDescription>Monthly revenue performance over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={analytics?.monthly_trend || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip formatter={(value) => [`RM ${value.toLocaleString()}`, "Revenue"]} />
-                <Line
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#3b82f6"
-                  strokeWidth={3}
-                  dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
 
         {/* Charts Grid */}
         <div className="grid gap-6 md:grid-cols-2">
@@ -162,7 +138,7 @@ export default function Analytics() {
           <Card>
             <CardHeader>
               <CardTitle>Revenue Composition</CardTitle>
-              <CardDescription>Revenue breakdown by product category</CardDescription>
+              <CardDescription>Revenue breakdown by product</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -180,7 +156,7 @@ export default function Analytics() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => [`${value}%`, "Share"]} />
+                  <Tooltip formatter={(value) => [`${value}%`, "Revenue Share"]} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex flex-wrap justify-center gap-4 mt-4">

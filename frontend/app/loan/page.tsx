@@ -4,12 +4,9 @@ import { useState, useEffect } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
 import axios from "axios"
-import { CheckCircle, XCircle, AlertCircle, CreditCard, TrendingUp, Building2, DollarSign } from "lucide-react"
+import { CheckCircle, XCircle, AlertCircle, CreditCard, Building2 } from "lucide-react"
 import { useBusiness } from "@/lib/business-context"
 
 interface LoanScore {
@@ -28,31 +25,14 @@ interface LoanProvider {
     interest_rate: number
     tenure_months: number
     description: string
+    url: string
   }>
 }
 
 export default function LoanCenter() {
   const [loanScore, setLoanScore] = useState<LoanScore | null>(null)
   const [loading, setLoading] = useState(false)
-  const [selectedProgram, setSelectedProgram] = useState<any>(null)
-  const [showApplication, setShowApplication] = useState(false)
   const { activeBusiness, loading: bizLoading } = useBusiness()
-
-  // Application form state
-  const [applicationData, setApplicationData] = useState({
-    applicant_name: "",
-    applicant_ic: "",
-    business_registration_number: "",
-    loan_amount: "",
-    loan_purpose: "",
-    monthly_income: "",
-    existing_debts: "",
-    collateral_details: "",
-    guarantor_name: "",
-    guarantor_ic: "",
-    contact_number: "",
-    email: ""
-  })
 
   useEffect(() => {
     if (bizLoading || !activeBusiness) return
@@ -79,32 +59,8 @@ export default function LoanCenter() {
     }
   }
 
-  const applyForLoan = (program: any, provider: any) => {
-    setSelectedProgram({ ...program, provider: provider.name })
-    setShowApplication(true)
-
-    // Auto-fill application form
-    setApplicationData({
-      applicant_name: activeBusiness?.business_name || "",
-      applicant_ic: "",
-      business_registration_number: "",
-      loan_amount: program.max_amount.toString(),
-      loan_purpose: "Business expansion and working capital",
-      monthly_income: activeBusiness?.monthly_revenue?.toString() || "",
-      existing_debts: activeBusiness?.existing_loan_commitment?.toString() || "",
-      collateral_details: "",
-      guarantor_name: "",
-      guarantor_ic: "",
-      contact_number: "",
-      email: ""
-    })
-  }
-
-  const submitApplication = async () => {
-    // In a real app, this would submit to a backend
-    alert("Application submitted successfully! You will be contacted within 3-5 business days.")
-    setShowApplication(false)
-    setSelectedProgram(null)
+  const applyForLoan = (program: any) => {
+    window.open(program.url, "_blank", "noopener,noreferrer")
   }
 
   const isProfileComplete = !!activeBusiness
@@ -152,52 +108,84 @@ export default function LoanCenter() {
     return <XCircle className="h-6 w-6 text-red-600" />
   }
 
-  // Mock loan providers (in real app, this would come from backend)
+  // Malaysian loan providers
   const loanProviders: LoanProvider[] = [
     {
-      name: "Bank Rakyat Indonesia (BRI)",
+      name: "CIMB Bank",
       programs: [
         {
-          name: "KUR Mikro",
+          name: "Micro-Financing",
           min_score: 0.3,
           max_amount: 50000,
-          interest_rate: 6.0,
+          interest_rate: 5.0,
           tenure_months: 60,
-          description: "For micro businesses with turnover up to RM300k/year"
+          description: "Micro-financing for small businesses with simplified documentation",
+          url: "https://www.cimb.com.my/en/business/products/financing/micro-financing.html"
         },
         {
-          name: "KUR Kecil",
+          name: "BizLite",
+          min_score: 0.5,
+          max_amount: 300000,
+          interest_rate: 6.5,
+          tenure_months: 84,
+          description: "Collateral-free financing for SMEs with annual turnover up to RM3M",
+          url: "https://www.cimb.com.my/en/business/products/financing/bizlite.html"
+        }
+      ]
+    },
+    {
+      name: "Maybank",
+      programs: [
+        {
+          name: "SME Clean Loan",
+          min_score: 0.4,
+          max_amount: 250000,
+          interest_rate: 6.0,
+          tenure_months: 60,
+          description: "Unsecured financing for SMEs to fund working capital and business growth",
+          url: "https://www.maybank2u.com.my/maybank2u/malaysia/en/business/financing/working_capital/sme_clean_loan.page"
+        }
+      ]
+    },
+    {
+      name: "Public Bank",
+      programs: [
+        {
+          name: "SWIFT Financing",
           min_score: 0.5,
           max_amount: 500000,
-          interest_rate: 7.0,
+          interest_rate: 5.5,
           tenure_months: 60,
-          description: "For small businesses with turnover RM300k-RM2.5M/year"
+          description: "Fast-track financing for established SMEs with strong business track record",
+          url: "https://www.pbebank.com/Business-Banking/Financing/SME-Financing.aspx"
         }
       ]
     },
     {
-      name: "BNI (Bank Negara Indonesia)",
+      name: "TEKUN Nasional",
       programs: [
         {
-          name: "BNI KUR",
-          min_score: 0.4,
+          name: "Skim Pembiayaan TEKUN",
+          min_score: 0.3,
           max_amount: 100000,
-          interest_rate: 6.5,
-          tenure_months: 48,
-          description: "Special financing for MSMEs"
+          interest_rate: 4.0,
+          tenure_months: 60,
+          description: "Government-backed micro-financing for Bumiputera micro and small entrepreneurs",
+          url: "https://www.tekun.gov.my/en/loan-financing/"
         }
       ]
     },
     {
-      name: "Bank Mandiri",
+      name: "Bank Rakyat",
       programs: [
         {
-          name: "Mandiri KUR",
-          min_score: 0.6,
-          max_amount: 200000,
-          interest_rate: 7.5,
+          name: "Pembiayaan Mikro-i",
+          min_score: 0.3,
+          max_amount: 50000,
+          interest_rate: 4.0,
           tenure_months: 60,
-          description: "Comprehensive financing for growing businesses"
+          description: "Islamic micro-financing for small traders, hawkers and micro entrepreneurs",
+          url: "https://www.bankrakyat.com.my/d/business/financing/micro-financing-i"
         }
       ]
     }
@@ -318,7 +306,7 @@ export default function LoanCenter() {
                               <p className="text-sm text-gray-600">{program.description}</p>
                             </div>
                             <Button
-                              onClick={() => applyForLoan(program, provider)}
+                              onClick={() => applyForLoan(program)}
                               size="sm"
                             >
                               Apply for {program.name}
@@ -351,149 +339,6 @@ export default function LoanCenter() {
           </Card>
         )}
 
-        {/* Loan Application Form */}
-        {showApplication && selectedProgram && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Apply for {selectedProgram.name} - {selectedProgram.provider}
-              </CardTitle>
-              <CardDescription>
-                Please fill in your application details. Some fields have been auto-filled based on your business profile.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="applicant_name">Applicant Name *</Label>
-                    <Input
-                      id="applicant_name"
-                      value={applicationData.applicant_name}
-                      onChange={(e) => setApplicationData({...applicationData, applicant_name: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="applicant_ic">IC Number *</Label>
-                    <Input
-                      id="applicant_ic"
-                      placeholder="e.g., 123456-78-9012"
-                      value={applicationData.applicant_ic}
-                      onChange={(e) => setApplicationData({...applicationData, applicant_ic: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="business_registration">Business Registration Number</Label>
-                    <Input
-                      id="business_registration"
-                      value={applicationData.business_registration_number}
-                      onChange={(e) => setApplicationData({...applicationData, business_registration_number: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="loan_amount">Requested Loan Amount (RM) *</Label>
-                    <Input
-                      id="loan_amount"
-                      type="number"
-                      value={applicationData.loan_amount}
-                      onChange={(e) => setApplicationData({...applicationData, loan_amount: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="loan_purpose">Loan Purpose *</Label>
-                    <Select value={applicationData.loan_purpose} onValueChange={(value) => setApplicationData({...applicationData, loan_purpose: value})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Business expansion and working capital">Business expansion and working capital</SelectItem>
-                        <SelectItem value="Purchase of equipment">Purchase of equipment</SelectItem>
-                        <SelectItem value="Inventory financing">Inventory financing</SelectItem>
-                        <SelectItem value="Property renovation">Property renovation</SelectItem>
-                        <SelectItem value="Debt refinancing">Debt refinancing</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="monthly_income">Monthly Business Income (RM) *</Label>
-                    <Input
-                      id="monthly_income"
-                      type="number"
-                      value={applicationData.monthly_income}
-                      onChange={(e) => setApplicationData({...applicationData, monthly_income: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="existing_debts">Existing Monthly Debt Payments (RM)</Label>
-                    <Input
-                      id="existing_debts"
-                      type="number"
-                      value={applicationData.existing_debts}
-                      onChange={(e) => setApplicationData({...applicationData, existing_debts: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="collateral">Collateral Details</Label>
-                    <Input
-                      id="collateral"
-                      placeholder="e.g., Business property, equipment, etc."
-                      value={applicationData.collateral_details}
-                      onChange={(e) => setApplicationData({...applicationData, collateral_details: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="guarantor_name">Guarantor Name</Label>
-                    <Input
-                      id="guarantor_name"
-                      value={applicationData.guarantor_name}
-                      onChange={(e) => setApplicationData({...applicationData, guarantor_name: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="guarantor_ic">Guarantor IC Number</Label>
-                    <Input
-                      id="guarantor_ic"
-                      value={applicationData.guarantor_ic}
-                      onChange={(e) => setApplicationData({...applicationData, guarantor_ic: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="contact">Contact Number *</Label>
-                    <Input
-                      id="contact"
-                      placeholder="e.g., +60123456789"
-                      value={applicationData.contact_number}
-                      onChange={(e) => setApplicationData({...applicationData, contact_number: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email Address *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={applicationData.email}
-                      onChange={(e) => setApplicationData({...applicationData, email: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-4 mt-6">
-                <Button onClick={submitApplication} className="flex-1">
-                  Submit Application
-                </Button>
-                <Button variant="outline" onClick={() => setShowApplication(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </DashboardLayout>
   )
