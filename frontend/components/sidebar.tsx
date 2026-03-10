@@ -45,7 +45,7 @@ export function Sidebar() {
             <span className="text-lg font-bold text-white">B</span>
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">BorNeo</h1>
+            <h1 className="text-lg font-semibold text-gray-900">BizView</h1>
             <p className="text-xs text-gray-500 uppercase tracking-wide">MSME Intelligence</p>
           </div>
         </div>
